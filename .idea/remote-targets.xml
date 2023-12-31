@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="RemoteTargetsManager">
+    <targets>
+      <target name="gr@172.16.2.168:7902" type="ssh/sftp" uuid="ff042e7c-90cf-4250-93a9-52c3b9807e6b">
+        <config>
+          <option name="projectRootOnTarget" value="/home/gr/wzyang/dataPricing/MCPBC" />
+          <option name="serverName" value="gr@172.16.2.168:7902 password" />
+        </config>
+        <ContributedStateBase type="JavaLanguageRuntime">
+          <config>
+            <option name="homePath" value="/home/gr/wzyang/jdk8" />
+            <option name="javaVersionString" value="1.8.0_202" />
+          </config>
+        </ContributedStateBase>
+      </target>
+      <target name="wenzheyang@115.156.114.131:13101" type="ssh/sftp" uuid="ea6007ed-3fcf-476b-8286-1b4d5853c241">
+        <config>
+          <option name="projectRootOnTarget" value="/home/wenzheyang/dataPricing/MCPBC/" />
+          <option name="serverName" value="wenzheyang@115.156.114.131:13101 password" />
+        </config>
+        <ContributedStateBase type="JavaLanguageRuntime">
+          <config>
+            <option name="homePath" value="/home/wenzheyang/jdk1.8.0_202" />
+            <option name="javaVersionString" value="1.8.0_202" />
+          </config>
+        </ContributedStateBase>
+      </target>
+    </targets>
+  </component>
+</project>
