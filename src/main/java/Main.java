@@ -20,7 +20,7 @@ public class Main {
     public static String siloName = "openGeo";
     public static String outFilePath1 = "D:\\GitHub\\SpatialDataAcquisition\\src\\Data\\result\\";
     public static int totalDatasetNumber = 1000;
-    public static int resolution = 16;
+    public static int resolution = 11;
     public static double delta = 0;
     public static double budget = 0.1;
     public static String graphfilePath = "";
@@ -38,134 +38,134 @@ public class Main {
     public static void main(String[] args) throws IOException, CloneNotSupportedException, ClassNotFoundException{
 
         boolean wirteLog = false;
-        String[] siloNameList = {"btaa-clean"}; // trackable, public, identifiable, btaa-clean
+        String[] siloNameList = {"trackable"}; // trackable, public, identifiable, btaa-clean, openGeo
         int[] resolutionList = {11};
         double[] deltaList = {10};
-        double[] budgetList = {0.1};
-        String[] algorithmList = {"SG","CMC+MG", "CMC+MC", "DPSA+BA", "BGPA"}; // "SG",  "DPSA+BA", "BGPA", "random", "CMC+MG", "CMC+MC",  "CA",
-            for (int t=0; t <siloNameList.length; t++){
-                siloName = siloNameList[t];
-                for (int i = 0; i<resolutionList.length; i++) {
-                    datasetIdMapSignature = new HashMap<>();
-                    datalakeRootNodes = new HashMap<>();
-                    resolution = resolutionList[i];
-                    datasetPrice = new HashMap<>();
-                    String index = "IBtree"; // invertedIndex // IBtree
-                    preProcessing(index);
+        double[] budgetList = {0.001};
+        String[] algorithmList = {"DSA", "CMC+MC", "CMC+MG", "DPSA+BA", "BGPA"};
+        for (int t=0; t <siloNameList.length; t++){
+            siloName = siloNameList[t];
+            for (int i = 0; i<resolutionList.length; i++) {
+                datasetIdMapSignature = new HashMap<>();
+                datalakeRootNodes = new HashMap<>();
+                resolution = resolutionList[i];
+                datasetPrice = new HashMap<>();
+                String index = "IBtree"; // invertedIndex // IBtree
+                preProcessing(index);
 
-                    double totalPrice = assignPrice();
+                double totalPrice = assignPrice();
 
-                    for (int j = 0; j < deltaList.length; j++) {
-                        delta = deltaList[j];
-                        graphfilePath = preprocessFilePath + siloName + "/" + "graph-" + "reso" + resolution + "-delta" + delta + "-number" + totalDatasetNumber + ".txt"; //ser
-                        graphInfo = new HashMap<>();
+                for (int j = 0; j < deltaList.length; j++) {
+                    delta = deltaList[j];
+                    graphfilePath = preprocessFilePath + siloName + "/" + "graph-" + "reso" + resolution + "-delta" + delta + "-number" + totalDatasetNumber + ".txt"; //ser
+                    graphInfo = new HashMap<>();
 
-                        //load graph
-                        long time11 = System.currentTimeMillis();
-                        graphInfo = silo.geneOrloadGraphJackson(graphfilePath, delta);
-                        long time12 = System.currentTimeMillis();
+                    //load graph
+                    long time11 = System.currentTimeMillis();
+                    graphInfo = silo.geneOrloadGraphJackson(graphfilePath, delta);
+                    long time12 = System.currentTimeMillis();
 
-                        System.out.println("graphInfo.keySet().size() = "+graphInfo.keySet().size());
-                        for (int s1 : graphInfo.keySet()) {
-                            HashSet<Integer> edgeInfo = graphInfo.get(s1);
+                    System.out.println("graphInfo.keySet().size() = "+graphInfo.keySet().size());
+                    for (int s1 : graphInfo.keySet()) {
+                        HashSet<Integer> edgeInfo = graphInfo.get(s1);
 //                            System.out.print(s1+", price="+datasetPrice.get(s1)+", "+edgeInfo.size());
-                            HashSet<String> subEdgeInfo = new HashSet<>();
-                            for (Integer s2 : edgeInfo) {
-                                    subEdgeInfo.add(String.valueOf(s2));
-                            }
-                            queryWindowGraphInfo.put(String.valueOf(s1), subEdgeInfo);
+                        HashSet<String> subEdgeInfo = new HashSet<>();
+                        for (Integer s2 : edgeInfo) {
+                            subEdgeInfo.add(String.valueOf(s2));
                         }
+                        queryWindowGraphInfo.put(String.valueOf(s1), subEdgeInfo);
+                    }
 
-                        HashMap<String, HashSet<String>> subGraphNodeIdLists = new HashMap<>();
-                        HashSet<String> allNodes = new HashSet<>();
-                        for (String s1 : queryWindowGraphInfo.keySet()) {
-                            allNodes.add(s1);
-                        }
-                        for (String s1 : queryWindowGraphInfo.keySet()) {
-                            if (allNodes.contains(s1)) {
-                                HashSet<String> hs = new HashSet<>();
-                                hs.add(s1);
+                    HashMap<String, HashSet<String>> subGraphNodeIdLists = new HashMap<>();
+                    HashSet<String> allNodes = new HashSet<>();
+                    for (String s1 : queryWindowGraphInfo.keySet()) {
+                        allNodes.add(s1);
+                    }
+                    for (String s1 : queryWindowGraphInfo.keySet()) {
+                        if (allNodes.contains(s1)) {
+                            HashSet<String> hs = new HashSet<>();
+                            hs.add(s1);
 
-                                Queue<String> queue = new LinkedList<>();
-                                queue.add(s1);
-                                allNodes.remove(s1);
-                                while (!queue.isEmpty()) {
-                                    String id = queue.poll();
-                                    HashSet<String> edgeInfo = queryWindowGraphInfo.get(id);
-                                    for (String s2 : edgeInfo) {
-                                        if (!hs.contains(s2)) {
-                                            hs.add(s2);
-                                            queue.add(s2);
-                                            allNodes.remove(s2);
-                                        }
-                                    }
-                                }
-                                subGraphNodeIdLists.put(s1, hs);
-                            }
-                        }
-
-                        PriorityQueue<relaxIndexNode> subGraphNodeIdListCovandPrice = new PriorityQueue<>(new Comparator<relaxIndexNode>() {
-                            @Override
-                            public int compare(relaxIndexNode o1, relaxIndexNode o2) {
-                                return (o2.getLb() - o1.getLb() > 0) ? 1 : -1;
-                            }
-                        }); // large -> small
-                        for (String s1 : subGraphNodeIdLists.keySet()) {
-                            double coverageNumber = 0;
-                            double price = 0;
-                            HashSet<String> hs = subGraphNodeIdLists.get(s1);
-                            for (String s2: hs){
-                                coverageNumber += datasetIdMapSignature.get(s2).size();
-                                price += datasetPrice.get(s2);
-                            }
-                            subGraphNodeIdListCovandPrice.add(new relaxIndexNode(s1, coverageNumber, price));
-                        }
-
-                        HashMap<String, HashMap<String, HashSet<String>>> subGraphS = new HashMap<>();
-                        HashMap<String, HashMap<String, indexNode>> subGraphIndexNodeS = new HashMap<>();
-                        for (String s : subGraphNodeIdLists.keySet()) {
-                            HashSet<String> subGraphNodeIds = subGraphNodeIdLists.get(s);
-                            HashMap<String, HashSet<String>> subGraph = new HashMap<>();
-                            HashMap<String, indexNode> subGraphIndexNode = new HashMap<>();
-                            for (String s1 : subGraphNodeIds) {
-                                HashSet<String> edgeInfo = queryWindowGraphInfo.get(s1);
-                                HashSet<String> subEdgeInfo = new HashSet<>();
+                            Queue<String> queue = new LinkedList<>();
+                            queue.add(s1);
+                            allNodes.remove(s1);
+                            while (!queue.isEmpty()) {
+                                String id = queue.poll();
+                                HashSet<String> edgeInfo = queryWindowGraphInfo.get(id);
                                 for (String s2 : edgeInfo) {
-                                    if (subGraphNodeIds.contains(s2)) {
-                                        subEdgeInfo.add(s2);
+                                    if (!hs.contains(s2)) {
+                                        hs.add(s2);
+                                        queue.add(s2);
+                                        allNodes.remove(s2);
                                     }
                                 }
-                                subGraph.put(s1, subEdgeInfo);
-                                subGraphIndexNode.put(s1, new indexNode(2));
                             }
-                            subGraphS.put(s, subGraph);
-                            subGraphIndexNodeS.put(s, subGraphIndexNode);
+                            subGraphNodeIdLists.put(s1, hs);
                         }
+                    }
+
+                    PriorityQueue<relaxIndexNode> subGraphNodeIdListCovandPrice = new PriorityQueue<>(new Comparator<relaxIndexNode>() {
+                        @Override
+                        public int compare(relaxIndexNode o1, relaxIndexNode o2) {
+                            return (o2.getLb() - o1.getLb() > 0) ? 1 : -1;
+                        }
+                    }); // large -> small
+                    for (String s1 : subGraphNodeIdLists.keySet()) {
+                        double coverageNumber = 0;
+                        double price = 0;
+                        HashSet<String> hs = subGraphNodeIdLists.get(s1);
+                        for (String s2: hs){
+                            coverageNumber += datasetIdMapSignature.get(s2).size();
+                            price += datasetPrice.get(s2);
+                        }
+                        subGraphNodeIdListCovandPrice.add(new relaxIndexNode(s1, coverageNumber, price));
+                    }
+
+                    HashMap<String, HashMap<String, HashSet<String>>> subGraphS = new HashMap<>();
+                    HashMap<String, HashMap<String, indexNode>> subGraphIndexNodeS = new HashMap<>();
+                    for (String s : subGraphNodeIdLists.keySet()) {
+                        HashSet<String> subGraphNodeIds = subGraphNodeIdLists.get(s);
+                        HashMap<String, HashSet<String>> subGraph = new HashMap<>();
+                        HashMap<String, indexNode> subGraphIndexNode = new HashMap<>();
+                        for (String s1 : subGraphNodeIds) {
+                            HashSet<String> edgeInfo = queryWindowGraphInfo.get(s1);
+                            HashSet<String> subEdgeInfo = new HashSet<>();
+                            for (String s2 : edgeInfo) {
+                                if (subGraphNodeIds.contains(s2)) {
+                                    subEdgeInfo.add(s2);
+                                }
+                            }
+                            subGraph.put(s1, subEdgeInfo);
+                            subGraphIndexNode.put(s1, new indexNode(2));
+                        }
+                        subGraphS.put(s, subGraph);
+                        subGraphIndexNodeS.put(s, subGraphIndexNode);
+                    }
 
 
 //                        statisticInfo(graphInfo, subGraphS);
 
 
 
-                        for (int k = 0; k < budgetList.length; k++) {
-                            budget = budgetList[k];   //  + "Number"+totalDatasetNumber
-                            String outFilePath2 = outFilePath1+ siloName+"/"  + "1227-reso" + resolution +"-delta"+delta+"-budget"+budget+"-number"+totalDatasetNumber+".txt";
-                            budget = budgetList[k] * totalPrice; // 100;  //180 ;//budgetList[k] * totalPrice;
-                            File file = new File(outFilePath1 + siloName+"/");
-                            if (!file.exists()){
-                                file.mkdir();
-                                System.out.println("create success 1");
+                    for (int k = 0; k < budgetList.length; k++) {
+                        budget = budgetList[k];   //  + "Number"+totalDatasetNumber
+                        String outFilePath2 = outFilePath1+ siloName+"/"  + "1227-reso" + resolution +"-delta"+delta+"-budget"+budget+"-number"+totalDatasetNumber+".txt";
+                        budget = budgetList[k] * totalPrice; // 100;  //180 ;//budgetList[k] * totalPrice;
+                        File file = new File(outFilePath1 + siloName+"/");
+                        if (!file.exists()){
+                            file.mkdir();
+                            System.out.println("create success 1");
+                        }
+
+                        File file2 = new File(outFilePath2);
+
+                        if (!file2.exists()) {
+                            if (wirteLog) {
+                                file2.createNewFile();
+                                System.out.println("create success 2");
+                                PrintStream out = new PrintStream(outFilePath2);
+                                System.setOut(out);
                             }
-
-                            File file2 = new File(outFilePath2);
-
-                            if (!file2.exists()) {
-                                if (wirteLog) {
-                                    file2.createNewFile();
-                                    System.out.println("create success 2");
-                                    PrintStream out = new PrintStream(outFilePath2);
-                                    System.setOut(out);
-                                }
                             System.out.print("Load graph time = "+ (time12 - time11)+" ms, ");
                             System.out.println("subGraph.size() = " + subGraphNodeIdLists.size());
                             System.out.println("siloName = "+siloName+",  "+ "resolution = "+resolution+",  "+ "Budget = "+budget/totalPrice+ ", Delta = "+delta);
@@ -214,13 +214,13 @@ public class Main {
                                         for (String s : resultPath) {
                                             int tt = coveredCells.size();
                                             coveredCells.addAll(datasetIdMapSignature.get(s));
-                                            System.out.println(s+" ,"+integerMaptoDatasetId.get(Integer.parseInt(s))+", coverage incremental =" +  (coveredCells.size()-tt)+"; ");
+//                                            System.out.println(s+" ,"+integerMaptoDatasetId.get(Integer.parseInt(s))+", coverage incremental =" +  (coveredCells.size()-tt)+"; ");
                                         }
                                         System.out.println("random selected result, C.size = "+coveredCells.size());
                                         break;
-                                    case "SG":
+                                    case "DSA":
                                         System.out.println("###############################");
-                                        System.out.println(" begin simple greedy" + ",  budget = " + budget);
+                                        System.out.println(" begin DSA" + ",  budget = " + budget);
                                         long time1 = System.currentTimeMillis();
                                         LinkedHashMap<String, Integer> result = simpleGreedy2(graphInfo);
                                         long time2 = System.currentTimeMillis();
@@ -231,9 +231,9 @@ public class Main {
                                     case "DPSA+BA":
                                         System.out.println("###############################");
                                         System.out.println(" begin DPSA+BA," + " budget = " + budget);
-                                         time31 = System.currentTimeMillis();
-    //                                    HashMap<String, LinkedHashMap<String, Integer>> IBGPAResultS = new HashMap<>();
-    //                                    ArrayList<Long> findCenterTime = new ArrayList<>();
+                                        time31 = System.currentTimeMillis();
+                                        //                                    HashMap<String, LinkedHashMap<String, Integer>> IBGPAResultS = new HashMap<>();
+                                        //                                    ArrayList<Long> findCenterTime = new ArrayList<>();
                                         iteration3 = 0;
                                         for (String s : subGraphNodeIdLists.keySet()) { //relaxIndexNode re: getDeletedSubgraphNodes(subGraphNodeIdListCovandPrice)
 //                                            String s = re.resultId;
@@ -255,10 +255,10 @@ public class Main {
                                             IBGPAResultS.put(s, rootLeafIncreHm);
                                         }
 
-                                         IBGPAMaxCoverage = findBest(IBGPAResultS);
-                                         time32 = System.currentTimeMillis();
+                                        IBGPAMaxCoverage = findBest(IBGPAResultS);
+                                        time32 = System.currentTimeMillis();
 
-                                         time = 0;
+                                        time = 0;
                                         for (long l:findCenterTime){
                                             time += l;
                                         }
@@ -271,8 +271,8 @@ public class Main {
                                         System.out.println("###############################");
                                         System.out.println(" begin BGPA," + " budget = " + budget);
                                         time31 = System.currentTimeMillis();
-    //
-                                         iteration3 = 0;
+                                        //
+                                        iteration3 = 0;
                                         for (String s : subGraphNodeIdLists.keySet()) { //
                                             //            System.out.println();
                                             getPminPmax(subGraphNodeIdLists.get(s));
@@ -294,9 +294,9 @@ public class Main {
                                                 }
                                             }
                                             IBGPAResultS.put(s, rootLeafIncreHm);
-    //                                    break;
+                                            //                                    break;
                                         }
-                                         IBGPAMaxCoverage = findBest(IBGPAResultS);
+                                        IBGPAMaxCoverage = findBest(IBGPAResultS);
                                         time32 = System.currentTimeMillis();
                                         time = 0;
                                         for (long l:findCenterTime){
@@ -309,27 +309,27 @@ public class Main {
                                         // for each subgraph find the result;
                                         System.out.println("###############################");
                                         System.out.println(" begin CMC + MG" + ",  budget = " + budget);
-                                         time31 = System.currentTimeMillis();
-                                         totalCoverage = 0.0;
-                                         iteration3 = 0;
-                                         prune = 0;
+                                        time31 = System.currentTimeMillis();
+                                        totalCoverage = 0.0;
+                                        iteration3 = 0;
+                                        prune = 0;
                                         for (String s: subGraphNodeIdLists.keySet()) {
                                             iteration3++;
                                             HashMap<String, HashSet<String>> subGraph = subGraphS.get(s);
                                             HashMap<String, indexNode> subGraphIndexNode = subGraphIndexNodeS.get(s);
-                                             coverageNumber = 0;
+                                            coverageNumber = 0;
                                             getPminPmax(subGraphNodeIdLists.get(s));
 
                                             if (subGraph.size() > 1) {
                                                 //                                        System.out.print("subgrah-" + iteration3 + ": pmax= " + outputPrice(p_max) + ", pmin= " + outputPrice(p_min) + ", ");
                                                 coverageNumber = CombinatorialAlgorithmSpeedMaxGain(subGraphIndexNode, subGraph);
-    //                                            System.out.println("subgrah-" + iteration3 +": coverage= " +coverageNumber);
+                                                //                                            System.out.println("subgrah-" + iteration3 +": coverage= " +coverageNumber);
                                             } else {
                                                 //                System.out.println("this graph only has one node");
                                                 for (String center : subGraph.keySet()) {
                                                     if (datasetPrice.get(center)<=budget)
                                                         coverageNumber =  datasetIdMapSignature.get(center).size();
-    //                                                System.out.println("subgrah!-" + iteration3 + ": coverage= " +coverageNumber);
+                                                    //                                                System.out.println("subgrah!-" + iteration3 + ": coverage= " +coverageNumber);
                                                     //                    System.out.println("iteration! "+1 +" = "+center +", root node coverage = "+ datasetIdMapSignature.get(center).size() +", getCurrentCost(resultPath) = "+datasetPrice.get(center));
                                                 }
                                             }
@@ -337,8 +337,8 @@ public class Main {
                                             if (coverageNumber> totalCoverage)
                                                 totalCoverage = coverageNumber;
                                         }
-    //                                int IBGPAMaxCoverage =  findBest(IBGPAResultS);
-                                         time32 = System.currentTimeMillis();
+                                        //                                int IBGPAMaxCoverage =  findBest(IBGPAResultS);
+                                        time32 = System.currentTimeMillis();
                                         System.out.println("CMC + MG:" + totalCoverage + ", running time = " + (time32 - time31) + "ms");
                                         System.out.println();
                                         break;
@@ -346,12 +346,12 @@ public class Main {
                                     case "CMC+MC":
                                         // //                           for each subgraph find the result;
                                         System.out.println("###############################");
-                                        System.out.println(" begin CMC + MC " + ",  budget = " + budget);
+                                        System.out.println(" begin CMC + MC" + ",  budget = " + budget);
                                         time31 = System.currentTimeMillis();
                                         totalCoverage = 0.0;
                                         iteration3 = 0;
                                         totalCoverage = 0;
-
+//                                        System.out.println("subGraphNodeIdLists.keySet().size() = "+subGraphNodeIdLists.keySet().size());
                                         for (String s: subGraphNodeIdLists.keySet()) {
                                             iteration3++;
                                             HashMap<String, HashSet<String>> subGraph = subGraphS.get(s);
@@ -360,11 +360,17 @@ public class Main {
                                             getPminPmax(subGraphNodeIdLists.get(s));
                                             if (subGraph.size() > 1) {
                                                 coverageNumber =  CombinatorialAlgorithmSpeedMaxSize(subGraphIndexNode, subGraph);
+                                            }else {
+                                                //                System.out.println("this graph only has one node");
+                                                for (String center : subGraph.keySet()) {
+                                                    if (datasetPrice.get(center)<=budget)
+                                                        coverageNumber =  datasetIdMapSignature.get(center).size();
+                                                }
                                             }
+//                                            System.out.println("coverageNumber = "+ coverageNumber );
                                             IBGPAResultSHM.put(s, coverageNumber);
                                             if (coverageNumber> totalCoverage)
                                                 totalCoverage = coverageNumber;
-
                                         }
 
                                         time32 = System.currentTimeMillis();
@@ -377,8 +383,8 @@ public class Main {
                                         break;
 
                                 }
+                            }
                         }
-                    }
                     }
 
 //*/
@@ -408,7 +414,7 @@ public class Main {
         //  3,number of subgraphs
         System.out.println("number of subgraph = "+subGraphS.size());
 
-       //  4，number of average cells
+        //  4，number of average cells
         int numberOfCells = 0;
         for (String s: datasetIdMapSignature.keySet()){
             numberOfCells+= datasetIdMapSignature.get(s).size();
@@ -430,13 +436,12 @@ public class Main {
         LinkedHashMap<String, Integer> resultHs1 = new LinkedHashMap<>();
         int H1 = 0;
         H1 = simpleGreedySubFunction2(resultHs1, subGraph, false);
-        System.out.println("h1= "+H1);
         int H2 = 0;
         LinkedHashMap<String, Integer> resultHs2 = new LinkedHashMap<>();
         resultHs2 = new LinkedHashMap<>();
 //        H2 = simpleGreedySubFunction2(resultHs2, subGraph, true);
         if (H1>=H2){
-            System.out.print("simple greedy finalResult is maxCov = "+ H1);
+            System.out.print("finalResult is maxCov = "+ H1);
             return resultHs1;
         }else {
             System.out.print("finalResult is maxRatio = "+ H2);
@@ -875,7 +880,7 @@ public class Main {
         return currentCost;
     }
 
-      public static double getCurrentCost(HashSet<String> resultPath){
+    public static double getCurrentCost(HashSet<String> resultPath){
         double currentCost = 0;
         if (resultPath.size()>0){
             for (String s : resultPath){
@@ -1328,18 +1333,18 @@ public class Main {
                         }
                     }
                 }
-                }
+            }
 
+        }
+        if (tempC.size()> C.size()){
+            for (String s: tempResultPath){
+                resultPath.add(s);
             }
-            if (tempC.size()> C.size()){
-                for (String s: tempResultPath){
-                    resultPath.add(s);
-                }
-                // note address reference;
+            // note address reference;
 //                C.clear();
-                for (long l: tempC)
-                    C.add(l);
-            }
+            for (long l: tempC)
+                C.add(l);
+        }
 
 
 //        System.out.print("C.size = "+ C.size()+": ");
@@ -1353,9 +1358,9 @@ public class Main {
     }
 
     public static int CombinatorialAlgorithmSpeedMaxSize(HashMap<String, indexNode> subGraphIndexNodes, HashMap<String, HashSet<String>> subGraph) {
-        HashSet<String> resultPath = new HashSet<>();//记录结果集合的ID
-        HashSet<Long> C = new HashSet<>(); //记录结果集合覆盖的元素ID
-        HashSet<String> tempResultPath = new HashSet<>(); //记录每次迭代的结果，所以每次迭代之前需要clear
+        HashSet<String> resultPath = new HashSet<>();
+        HashSet<Long> C = new HashSet<>();
+        HashSet<String> tempResultPath = new HashSet<>();
         HashSet<Long> tempC = new HashSet<>();
 
         HashSet<String> totalResult = new HashSet<>();
@@ -1364,6 +1369,7 @@ public class Main {
                 totalResult.add(idd);
             }
         }
+//        System.out.println("totalResult = "+totalResult );
 
         if (totalResult.size()>0) {
             String center = "";
@@ -1656,33 +1662,33 @@ public class Main {
             for (String leafId: leafNodeList.keySet())
                 leafDatasetId.add(leafId);
             for (String leafId: leafDatasetId){
-                    //                System.out.println("leafId = "+leafId);
-                    indexNode leaf = leafNodeList.get(leafId);
-                    HashSet<Long> S_L_i = S_L.get(leaf.getDeviceID());
-                    int setIntersection = S_L_i.size();
-                    for (Long l: S_L_i){
-                        if (C.contains(l)){
-                            setIntersection --;
-                        }
+                //                System.out.println("leafId = "+leafId);
+                indexNode leaf = leafNodeList.get(leafId);
+                HashSet<Long> S_L_i = S_L.get(leaf.getDeviceID());
+                int setIntersection = S_L_i.size();
+                for (Long l: S_L_i){
+                    if (C.contains(l)){
+                        setIntersection --;
                     }
+                }
 
 
                 if (setIntersection>0){
-                        if (maxRatio == false){
-                            coverageIncremental.add(new relaxIndexNode(leaf.getDeviceID(), setIntersection));
-                        }else {
+                    if (maxRatio == false){
+                        coverageIncremental.add(new relaxIndexNode(leaf.getDeviceID(), setIntersection));
+                    }else {
 //                        1, 计算路径的价格，
-                            ArrayList<String> path = recordPaths.get(leaf.getDeviceID());
-                            HashSet<String> newNode = new HashSet<>();
-                            for (int i=0; i<path.size(); i++){
-                                String id = path.get(i);
-                                if (!resultPath.contains(id)){
-                                    newNode.add(id);
-                                }
+                        ArrayList<String> path = recordPaths.get(leaf.getDeviceID());
+                        HashSet<String> newNode = new HashSet<>();
+                        for (int i=0; i<path.size(); i++){
+                            String id = path.get(i);
+                            if (!resultPath.contains(id)){
+                                newNode.add(id);
                             }
-                            coverageIncremental.add(new relaxIndexNode(leaf.getDeviceID(), (double) setIntersection /getCurrentCost(newNode) , setIntersection));
                         }
+                        coverageIncremental.add(new relaxIndexNode(leaf.getDeviceID(), (double) setIntersection /getCurrentCost(newNode) , setIntersection));
                     }
+                }
             }// 按照leaf node的增量从大到小排序
 
 
@@ -1785,7 +1791,7 @@ public class Main {
         LinkedHashMap<String, Integer> simpleGreedyResult = simpleGreedyResultS.get(simpleMaxId);
 //        output result
         for (String leafid: simpleGreedyResult.keySet()){
-            System.out.println(leafid+"," + integerMaptoDatasetId.get(Integer.parseInt(leafid))+",  coverage incremental = " +simpleGreedyResult.get(leafid)+", price = "+datasetPrice.get(leafid));
+//            System.out.println(leafid+"," + integerMaptoDatasetId.get(Integer.parseInt(leafid))+",  coverage incremental = " +simpleGreedyResult.get(leafid)+", price = "+datasetPrice.get(leafid));
         }
         if (simpleMaxId.equals("")){
             System.out.print("simpleMaxId = -1"+",  "+simpleMaxCoverage+", ");
